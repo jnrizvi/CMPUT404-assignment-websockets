@@ -22,6 +22,35 @@ import time
 import json
 import os
 
+# FROM:  https://github.com/abramhindle/WebSocketsExamples/blob/master/chat.py 2021-03-22 by abramhindle
+# try:
+#     while True:
+#         msg = ws.receive()
+#         print "WS RECV: %s" % msg
+#         if (msg is not None):
+#             packet = json.loads(msg)
+#             send_all_json( packet )
+#         else:
+#             break
+# except:
+#     '''Done'''
+
+# client = Client()
+# clients.append(client)
+# g = gevent.spawn( read_ws, ws, client )    
+# try:
+#     while True:
+#         # block here
+#         msg = client.get()
+#         ws.send(msg)
+# except Exception as e:# WebSocketError as e:
+#     print "WS Error %s" % e
+# finally:
+#     clients.remove(client)
+#     gevent.kill(g)
+
+# END FROM
+
 app = Flask(__name__)
 sockets = Sockets(app)
 app.debug = True
@@ -59,29 +88,66 @@ class World:
     def world(self):
         return self.space
 
-myWorld = World()        
+myWorld = World()     
 
+connectedClients = []
+
+# HELP: What do I use this for???
 def set_listener( entity, data ):
     ''' do something with the update ! '''
+    
+    pass
 
 myWorld.add_set_listener( set_listener )
         
 @app.route('/')
 def hello():
     '''Return something coherent here.. perhaps redirect to /static/index.html '''
-    return None
 
-def read_ws(ws,client):
+    return flask.redirect("/static/index.html")
+
+# HELP: In the example code (where I derived this from), the client variable isn't used
+def read_ws(ws, client):
     '''A greenlet function that reads from the websocket and updates the world'''
     # XXX: TODO IMPLEMENT ME
-    return None
 
+    try:
+        while True:
+            msg = ws.receive()
+            print "WS RECV: %s" % msg
+            if (msg is not None):
+                packet = json.loads(msg)
+                print(packet)
+
+                # # Each entity in each connected client?????
+                # # Or maybe this is where I use set_listener?
+                # for client in connectedClients:
+                #     myWorld.update()
+                # # send_all_json( packet )
+            else:
+                break
+    except:
+        '''Done'''
+
+# HELP:
 @sockets.route('/subscribe')
 def subscribe_socket(ws):
     '''Fufill the websocket URL of /subscribe, every update notify the
        websocket and read updates from the websocket '''
     # XXX: TODO IMPLEMENT ME
-    return None
+    
+    aConnectedClientWorld = World()
+    connectedClients.append(aConnectedClientWorld)
+    g = gevent.spawn( read_ws, ws, aConnectedClientWorld )    
+    try:
+        while True:
+            msg = aConnectedClientWorld.get()
+            ws.send(msg)
+    except Exception as e:
+        print "Websocket Error: %s" % e
+    finally:
+        connectedClients.remove(aConnectedClientWorld)
+        gevent.kill(g)
 
 
 # I give this to you, this is how you get the raw body/data portion of a post in flask
@@ -96,26 +162,57 @@ def flask_post_json():
     else:
         return json.loads(request.form.keys()[0])
 
+
+
+
+
+"""
+This part, I just used what I put in assignment 4 because it is the same.
+
+"""
+
+
+
+
 @app.route("/entity/<entity>", methods=['POST','PUT'])
 def update(entity):
     '''update the entities via this interface'''
-    return None
+    
+    requestData = flask_post_json()
+
+    # get the <entity> url param from the entity variable
+    myEntity = myWorld.get(entity)
+
+    # If an entity doesn't exist, create a new one
+    if myEntity == {}:
+        myWorld.set(entity, requestData)
+    else:
+        for key in requestData.keys():
+            # print("Key:", key, "Value:", requestData[key])
+            myWorld.update(entity, key, requestData[key])
+
+    return (json.dumps(requestData), 200)
+
 
 @app.route("/world", methods=['POST','GET'])    
 def world():
     '''you should probably return the world here'''
-    return None
+    
+    return (json.dumps(myWorld.world()), 200)
 
 @app.route("/entity/<entity>")    
 def get_entity(entity):
     '''This is the GET version of the entity interface, return a representation of the entity'''
-    return None
+    
+    return (json.dumps(myWorld.get(entity)), 200)
 
 
 @app.route("/clear", methods=['POST','GET'])
 def clear():
     '''Clear the world out!'''
-    return None
+    myWorld.clear()
+    
+    return (json.dumps({ "message": "Cleared the world!" }), 200)
 
 
 
