@@ -107,17 +107,20 @@ def hello():
     return flask.redirect("/static/index.html")
 
 # HELP: In the example code (where I derived this from), the client variable isn't used
+# something like a thread, called a greenlet.
 def read_ws(ws, client):
     '''A greenlet function that reads from the websocket and updates the world'''
     # XXX: TODO IMPLEMENT ME
 
     try:
         while True:
-            msg = ws.receive()
+            # blocking call
+            msg = ws.receive() # asynchronous thread. come back when there's something to receive from websocket
             print "WS RECV: %s" % msg
             if (msg is not None):
                 packet = json.loads(msg)
                 print(packet)
+                # send message to everyone the message you just sent. Send to all listeners/clients.
 
                 # # Each entity in each connected client?????
                 # # Or maybe this is where I use set_listener?
@@ -125,11 +128,13 @@ def read_ws(ws, client):
                 #     myWorld.update()
                 # # send_all_json( packet )
             else:
+                # else probably have an error
                 break
     except:
         '''Done'''
 
 # HELP:
+# Subscribe to the socket by going to url. Sets up your websocket take a websocket as an arg
 @sockets.route('/subscribe')
 def subscribe_socket(ws):
     '''Fufill the websocket URL of /subscribe, every update notify the
@@ -138,10 +143,20 @@ def subscribe_socket(ws):
     
     aConnectedClientWorld = World()
     connectedClients.append(aConnectedClientWorld)
+
+    # spawn two greenlet threads for every client: 
+    # this subscribe_socket will be its own greenlet thread
+    # and read_ws will be its own thread
     g = gevent.spawn( read_ws, ws, aConnectedClientWorld )    
     try:
+        # run main thread
         while True:
+            # get messages from the client 
+            # when send_all happens in read_ws, .get unblocks here 
+            # Why? because in the example, the Client class just wraps Queue, which comes from gevent
             msg = aConnectedClientWorld.get()
+            # Its hitting the client, and when it gets something, it will send it
+            # Sends message back on the websocket
             ws.send(msg)
     except Exception as e:
         print "Websocket Error: %s" % e
