@@ -100,7 +100,7 @@ function drawNextFrame() {
 function drawFrame() {
     if (drawNext) {
         renderFrame();
-        drawNext = false;
+        // drawNext = false;
     }
 }
 
@@ -279,7 +279,7 @@ function wsSetup() {
             // console.log(something)
             // world = something
             // or if something is just the parts that are different
-            // world = {...world, ...something}
+            world = {...world, ...something}
         } catch (e) {
             alert("socket on message: " + e);
         }

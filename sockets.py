@@ -22,6 +22,27 @@ import time
 import json
 import os
 
+# FROM: https://github.com/uofa-cmput404/cmput404-slides/blob/master/examples/WebSocketsExamples/chat.py 2021-03-27 by uofa-cmput404
+# clients = list()
+
+# def send_all(msg):
+#     for client in clients:
+#         client.put( msg )
+
+# def send_all_json(obj):
+#     send_all( json.dumps(obj) )
+
+# class Client:
+#     def __init__(self):
+#         self.queue = queue.Queue()
+
+#     def put(self, v):
+#         self.queue.put_nowait(v)
+
+#     def get(self):
+#         return self.queue.get()
+# END FROM
+
 # FROM:  https://github.com/abramhindle/WebSocketsExamples/blob/master/chat.py 2021-03-22 by abramhindle
 # try:
 #     while True:
@@ -55,16 +76,26 @@ app = Flask(__name__)
 sockets = Sockets(app)
 app.debug = True
 
-connectedClients = []
+connectedClients = list()
 
-# # !!!
-# def send_all(msg):
-#     for client in connectedClients:
-#         client.put( msg )
+def send_all(msg):
+    for client in connectedClients:
+        client.put( msg )
 
-# # !!!
-# def send_all_json(obj):
-#     send_all( json.dumps(obj) )
+def send_all_json(obj):
+    send_all( json.dumps(obj) )
+
+# Seems like I just need Hazel's Client class? -_-
+# So this class manages the websocket connection, and World class stays untouched.
+class Client:
+    def __init__(self):
+        self.queue = queue.Queue()
+
+    def put(self, v):
+        self.queue.put_nowait(v)
+
+    def get(self):
+        return self.queue.get()
 
 # Hindle says I can just have a list of clients that are basically gevent queues...?
 # Push the new change onto those queues and then the write thread is just 
@@ -75,7 +106,7 @@ class World:
         # we've got listeners now!
         self.listeners = list()
         # Each client needs a queue
-        self.queue = queue.Queue()
+        # self.queue = queue.Queue()
         
     # add_set_listener adds a set_listener callback. 
     # The set_listener callback to enqueue the state update. So every client should have a set_listener added to the world.
@@ -101,22 +132,14 @@ class World:
     def clear(self):
         self.space = dict()
 
-    # def get(self, entity):
-    #     return self.space.get(entity,dict())
+    def get(self, entity):
+        return self.space.get(entity,dict())
     
     def world(self):
         return self.space
 
-    # !!!
-    def put(self, v):
-        self.queue.put_nowait(v)
-    
-    # !!!
-    def get(self):
-        return self.queue.get()
 
 myWorld = World()     
-
 
 # HELP: What do I use this for???
 # Do you mean the listeners are gevent queues?
@@ -148,8 +171,21 @@ def read_ws(ws, client):
             print( "WS RECV: %s" % msg)
             if (msg is not None):
                 packet = json.loads(msg)
-                print(packet)
+                # print(packet)
                 # send message to everyone the message you just sent. Send to all listeners/clients.
+                
+                try:
+                    while True:
+                        msg = ws.receive()
+                        print("WS RECV: %s" % msg)
+                        if (msg is not None):
+                            packet = json.loads(msg)
+                            send_all_json( packet )
+                        else:
+                            break
+                except:
+                    '''Done'''
+
 
                 # # If an entity doesn't exist, create a new one
                 # if myEntity == {}:
@@ -159,10 +195,10 @@ def read_ws(ws, client):
                 #         # print("Key:", key, "Value:", requestData[key])
                 #         myWorld.update(entity, key, requestData[key])
 
-                for key in packet.keys():
-                    # print("Key:", key, "Value:", packet[key])
-                    # myWorld.update(key, key, packet[key])
-                    myWorld.set(key, packet[key])
+                # for key in packet.keys():
+                #     # print("Key:", key, "Value:", packet[key])
+                #     # myWorld.update(key, key, packet[key])
+                #     myWorld.set(key, packet[key])
 
             else:
                 # else probably have an error
@@ -178,7 +214,8 @@ def subscribe_socket(ws):
        websocket and read updates from the websocket '''
     # XXX: TODO IMPLEMENT ME
     
-    aConnectedClientWorld = World()
+    # aConnectedClientWorld = World()
+    aConnectedClientWorld = Client()
     connectedClients.append(aConnectedClientWorld)
 
     # spawn two greenlet threads for every client: 
@@ -199,7 +236,7 @@ def subscribe_socket(ws):
             # Because it's a gevent queue, that's its whole purpose. When gevent processes 1 step of its 
             # event loop it'll call upon all of its queues that have data and have get calls blocking on it. Then it will fufill those calls.
             msg = aConnectedClientWorld.get()
-            print(".get unblocked. msg:", msg)
+            print(".get is unblocked. msg is:", msg)
             # Its hitting the client, and when it gets a message, it will send it back on the websocket
             ws.send(msg)
     except Exception as e:
