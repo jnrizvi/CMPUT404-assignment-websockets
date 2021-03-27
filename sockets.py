@@ -148,7 +148,7 @@ def set_listener( entity, data ):
     ''' do something with the update ! '''
     
     for client in connectedClients:
-        client.put( json.dumps({ entity: data }) ) # kind of like sendall in the code example
+        client.put( json.dumps({ entity: data }) ) # adds
 
 myWorld.add_set_listener( set_listener )
         
@@ -174,17 +174,8 @@ def read_ws(ws, client):
                 # print(packet)
                 # send message to everyone the message you just sent. Send to all listeners/clients.
                 
-                try:
-                    while True:
-                        msg = ws.receive()
-                        print("WS RECV: %s" % msg)
-                        if (msg is not None):
-                            packet = json.loads(msg)
-                            send_all_json( packet )
-                        else:
-                            break
-                except:
-                    '''Done'''
+                
+                send_all_json( packet )
 
 
                 # # If an entity doesn't exist, create a new one
@@ -333,4 +324,4 @@ if __name__ == "__main__":
         gunicorn -k flask_sockets.worker sockets:app
     '''
     # app.run()
-    os.system("gunicorn -k flask_sockets.worker sockets:app");
+    os.system("gunicorn -k flask_sockets.worker sockets:app")
