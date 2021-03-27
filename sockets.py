@@ -55,11 +55,24 @@ app = Flask(__name__)
 sockets = Sockets(app)
 app.debug = True
 
+# !!!
+def send_all(msg):
+    for client in clients:
+        client.put( msg )
+
+# !!!
+def send_all_json(obj):
+    send_all( json.dumps(obj) )
+
+# Hindle says I can just have a list of clients that are basically gevent queues...?
+# Push the new change onto those queues and then the write thread is just 
+# waiting on the queue and printing it out to the socket
 class World:
     def __init__(self):
         self.clear()
         # we've got listeners now!
         self.listeners = list()
+        self.queue = queue.Queue()
         
     def add_set_listener(self, listener):
         self.listeners.append( listener )
@@ -88,11 +101,20 @@ class World:
     def world(self):
         return self.space
 
+    # !!!
+    def put(self, v):
+        self.queue.put_nowait(v)
+    
+    # !!!
+    def get(self):
+        return self.queue.get()
+
 myWorld = World()     
 
 connectedClients = []
 
 # HELP: What do I use this for???
+# Do you mean the listeners are gevent queues?
 def set_listener( entity, data ):
     ''' do something with the update ! '''
     
@@ -116,7 +138,7 @@ def read_ws(ws, client):
         while True:
             # blocking call
             msg = ws.receive() # asynchronous thread. come back when there's something to receive from websocket
-            print "WS RECV: %s" % msg
+            print( "WS RECV: %s" % msg)
             if (msg is not None):
                 packet = json.loads(msg)
                 print(packet)
@@ -126,7 +148,7 @@ def read_ws(ws, client):
                 # # Or maybe this is where I use set_listener?
                 # for client in connectedClients:
                 #     myWorld.update()
-                # # send_all_json( packet )
+                send_all_json( packet )
             else:
                 # else probably have an error
                 break
@@ -154,12 +176,16 @@ def subscribe_socket(ws):
             # get messages from the client 
             # when send_all happens in read_ws, .get unblocks here 
             # Why? because in the example, the Client class just wraps Queue, which comes from gevent
+            # .get is currently not available in World.
+
+            # Wait, but how does .get know that it should unblock when .put_nowait has been called?
+            # I'm mainly having trouble understanding how gevent is involved.
             msg = aConnectedClientWorld.get()
             # Its hitting the client, and when it gets something, it will send it
             # Sends message back on the websocket
             ws.send(msg)
     except Exception as e:
-        print "Websocket Error: %s" % e
+        print("Websocket Error: %s" % e)
     finally:
         connectedClients.remove(aConnectedClientWorld)
         gevent.kill(g)
@@ -237,4 +263,5 @@ if __name__ == "__main__":
         and run
         gunicorn -k flask_sockets.worker sockets:app
     '''
-    app.run()
+    # app.run()
+    os.system("gunicorn -k flask_sockets.worker sockets:app");

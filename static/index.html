@@ -246,6 +246,8 @@ mouse.mousedraggers.push(function(x,y,clicked,e) {
 
 function update() {
     drawFrame();
+
+    // Do I need anything else here?
 }
 
 
@@ -254,6 +256,7 @@ function wsSetup() {
     socket = new WebSocket(url);
     socket.onopen = function() {
         //XXX: TODO What are you going to do here?
+        // Do nothing
     };
     socket.onerror = function(msg) {
         debug("WebSocket Error:" + msg.data);
@@ -261,7 +264,14 @@ function wsSetup() {
     socket.onmessage = function(msg) {  
         try {
             debug("WebSocket Recv:" + msg.data);
-            //XXX: TODO What are you going to do here?            
+            //XXX: TODO What are you going to do here?    
+            
+            var something = JSON.parse(msg.data);
+           
+            // console.log(something)
+            // world = something
+            // or if something is just the parts that are different
+            // world = {...world, ...something}
         } catch (e) {
             alert("socket on message: " + e);
         }
