@@ -236,8 +236,22 @@ def subscribe_socket(ws):
             # Because it's a gevent queue, that's its whole purpose. When gevent processes 1 step of its 
             # event loop it'll call upon all of its queues that have data and have get calls blocking on it. Then it will fufill those calls.
             msg = aConnectedClientWorld.get()
-            print(".get is unblocked. msg is:", msg)
-            # Its hitting the client, and when it gets a message, it will send it back on the websocket
+            # print(".get is unblocked. msg is:", msg)
+            
+            # myEntity = myWorld.get(msg.keys)
+
+            #  # If an entity doesn't exist, create a new one
+            # if myEntity == {}:
+            #     for key in msg.keys:
+            #         # print("Key:", key, "Value:", requestData[key])
+            #         myWorld.set(key, msg[key])
+            #     # myWorld.set(msg.keys, msg[msg.keys])
+            # else:
+            #     for key in msg.keys:
+            #         # print("Key:", key, "Value:", requestData[key])
+            #         myWorld.update(key, key, msg[key])
+
+            # Its hitting the client, and when it gets a message, it will send it back on the websocket            
             ws.send(msg)
     except Exception as e:
         print("Websocket Error: %s" % e)
