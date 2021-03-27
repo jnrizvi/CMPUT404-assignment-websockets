@@ -91,22 +91,19 @@ class Client:
     def __init__(self):
         self.queue = queue.Queue()
 
+    # Push the new change onto those queues and then the write/subscription thread is just 
+    # waiting on the queue and printing it out to the socket
     def put(self, v):
         self.queue.put_nowait(v)
 
     def get(self):
         return self.queue.get()
 
-# Hindle says I can just have a list of clients that are basically gevent queues...?
-# Push the new change onto those queues and then the write thread is just 
-# waiting on the queue and printing it out to the socket
 class World:
     def __init__(self):
         self.clear()
         # we've got listeners now!
         self.listeners = list()
-        # Each client needs a queue
-        # self.queue = queue.Queue()
         
     # add_set_listener adds a set_listener callback. 
     # The set_listener callback to enqueue the state update. So every client should have a set_listener added to the world.
@@ -141,14 +138,14 @@ class World:
 
 myWorld = World()     
 
-# HELP: What do I use this for???
-# Do you mean the listeners are gevent queues?
-# every client should have a set_listener added to the world.
+
+# Every client should have a set_listener added to the world.
 def set_listener( entity, data ):
     ''' do something with the update ! '''
     
     for client in connectedClients:
-        client.put( json.dumps({ entity: data }) ) # adds
+        # adds the entity and data to the queue for each client
+        client.put( json.dumps({ entity: data }) )
 
 myWorld.add_set_listener( set_listener )
         
@@ -158,7 +155,7 @@ def hello():
 
     return flask.redirect("/static/index.html")
 
-# HELP: In the example code (where I derived this from), the client variable isn't used
+
 # something like a thread, called a greenlet.
 def read_ws(ws, client):
     '''A greenlet function that reads from the websocket and updates the world'''
@@ -172,24 +169,9 @@ def read_ws(ws, client):
             if (msg is not None):
                 packet = json.loads(msg)
                 # print(packet)
-                # send message to everyone the message you just sent. Send to all listeners/clients.
-                
-                
+
+                # send message to everyone the message you just sent. Send to all listeners/clients.                
                 send_all_json( packet )
-
-
-                # # If an entity doesn't exist, create a new one
-                # if myEntity == {}:
-                #     myWorld.set(entity, requestData)
-                # else:
-                #     for key in requestData.keys():
-                #         # print("Key:", key, "Value:", requestData[key])
-                #         myWorld.update(entity, key, requestData[key])
-
-                # for key in packet.keys():
-                #     # print("Key:", key, "Value:", packet[key])
-                #     # myWorld.update(key, key, packet[key])
-                #     myWorld.set(key, packet[key])
 
             else:
                 # else probably have an error
@@ -221,29 +203,14 @@ def subscribe_socket(ws):
             # Why? because in the example, the Client class just wraps Queue, which comes from gevent
             # .get is currently not available in World.
 
-            # Wait, but how does .get know that it should unblock when .put_nowait has been called?
-            # I'm mainly having trouble understanding how gevent is involved.
-
-            # Because it's a gevent queue, that's its whole purpose. When gevent processes 1 step of its 
-            # event loop it'll call upon all of its queues that have data and have get calls blocking on it. Then it will fufill those calls.
+            # When gevent processes 1 step of its event loop it'll call upon all of its queues that have 
+            # data and have get calls blocking on it. Then it will fufill those calls.
             msg = aConnectedClientWorld.get()
             # print(".get is unblocked. msg is:", msg)
-            
-            # myEntity = myWorld.get(msg.keys)
-
-            #  # If an entity doesn't exist, create a new one
-            # if myEntity == {}:
-            #     for key in msg.keys:
-            #         # print("Key:", key, "Value:", requestData[key])
-            #         myWorld.set(key, msg[key])
-            #     # myWorld.set(msg.keys, msg[msg.keys])
-            # else:
-            #     for key in msg.keys:
-            #         # print("Key:", key, "Value:", requestData[key])
-            #         myWorld.update(key, key, msg[key])
 
             # Its hitting the client, and when it gets a message, it will send it back on the websocket            
             ws.send(msg)
+
     except Exception as e:
         print("Websocket Error: %s" % e)
     finally:
@@ -265,14 +232,10 @@ def flask_post_json():
 
 
 
-
-
 """
 This part, I just used what I put in assignment 4 because it is the same.
 
 """
-
-
 
 
 @app.route("/entity/<entity>", methods=['POST','PUT'])
