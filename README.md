@@ -6,6 +6,10 @@ See requirements.org (plain-text) for a description of the project.
 
 Make a shared state Websockets drawing program
 
+# Collaborators' ccids
+
+Mustafa Khairullah (khairull)
+
 # Prereqs
 
 Create a virtual environment and install the required dependencies.

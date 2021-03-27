@@ -55,14 +55,16 @@ app = Flask(__name__)
 sockets = Sockets(app)
 app.debug = True
 
-# !!!
-def send_all(msg):
-    for client in clients:
-        client.put( msg )
+connectedClients = []
 
-# !!!
-def send_all_json(obj):
-    send_all( json.dumps(obj) )
+# # !!!
+# def send_all(msg):
+#     for client in connectedClients:
+#         client.put( msg )
+
+# # !!!
+# def send_all_json(obj):
+#     send_all( json.dumps(obj) )
 
 # Hindle says I can just have a list of clients that are basically gevent queues...?
 # Push the new change onto those queues and then the write thread is just 
@@ -72,11 +74,15 @@ class World:
         self.clear()
         # we've got listeners now!
         self.listeners = list()
+        # Each client needs a queue
         self.queue = queue.Queue()
         
+    # add_set_listener adds a set_listener callback. 
+    # The set_listener callback to enqueue the state update. So every client should have a set_listener added to the world.
     def add_set_listener(self, listener):
         self.listeners.append( listener )
 
+    # HELP: Where do I call this? Inside read_ws?
     def update(self, entity, key, value):
         entry = self.space.get(entity,dict())
         entry[key] = value
@@ -95,8 +101,8 @@ class World:
     def clear(self):
         self.space = dict()
 
-    def get(self, entity):
-        return self.space.get(entity,dict())
+    # def get(self, entity):
+    #     return self.space.get(entity,dict())
     
     def world(self):
         return self.space
@@ -111,14 +117,15 @@ class World:
 
 myWorld = World()     
 
-connectedClients = []
 
 # HELP: What do I use this for???
 # Do you mean the listeners are gevent queues?
+# every client should have a set_listener added to the world.
 def set_listener( entity, data ):
     ''' do something with the update ! '''
     
-    pass
+    for client in connectedClients:
+        client.put( json.dumps({ entity: data }) ) # kind of like sendall in the code example
 
 myWorld.add_set_listener( set_listener )
         
@@ -144,11 +151,19 @@ def read_ws(ws, client):
                 print(packet)
                 # send message to everyone the message you just sent. Send to all listeners/clients.
 
-                # # Each entity in each connected client?????
-                # # Or maybe this is where I use set_listener?
-                # for client in connectedClients:
-                #     myWorld.update()
-                send_all_json( packet )
+                # # If an entity doesn't exist, create a new one
+                # if myEntity == {}:
+                #     myWorld.set(entity, requestData)
+                # else:
+                #     for key in requestData.keys():
+                #         # print("Key:", key, "Value:", requestData[key])
+                #         myWorld.update(entity, key, requestData[key])
+
+                for key in packet.keys():
+                    # print("Key:", key, "Value:", packet[key])
+                    # myWorld.update(key, key, packet[key])
+                    myWorld.set(key, packet[key])
+
             else:
                 # else probably have an error
                 break
@@ -180,9 +195,12 @@ def subscribe_socket(ws):
 
             # Wait, but how does .get know that it should unblock when .put_nowait has been called?
             # I'm mainly having trouble understanding how gevent is involved.
+
+            # Because it's a gevent queue, that's its whole purpose. When gevent processes 1 step of its 
+            # event loop it'll call upon all of its queues that have data and have get calls blocking on it. Then it will fufill those calls.
             msg = aConnectedClientWorld.get()
-            # Its hitting the client, and when it gets something, it will send it
-            # Sends message back on the websocket
+            print(".get unblocked. msg:", msg)
+            # Its hitting the client, and when it gets a message, it will send it back on the websocket
             ws.send(msg)
     except Exception as e:
         print("Websocket Error: %s" % e)
